@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sopa de letras · Migraña en atención primaria</title>
+<style>
+  :root{--bg:#0d0d12;--panel:#17171f;--line:#2a2a36;--txt:#f2f2f7;--mut:#a3a3b5;--pur:#8E6CC8;--ok:#3fbf7f;
+    --grad:linear-gradient(90deg,#3b82f6,#8E6CC8,#ec4899);}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px 18px 32px}
+  .bar{height:4px;background:var(--grad);border-radius:4px;margin-bottom:18px}
+  .brand{font-weight:700;color:var(--mut);font-size:.85rem;letter-spacing:.04em;margin-bottom:8px}
+  .brand span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  h1{font-size:1.45rem;margin:0 0 6px}
+  p.intro{color:var(--mut);margin:0 0 18px;line-height:1.5}
+  .layout{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+  .board{flex:1 1 440px;min-width:0;max-width:560px}
+  .stats{display:flex;justify-content:space-between;color:var(--mut);font-size:.9rem;margin-bottom:8px}
+  .stats b{color:var(--txt)}
+  #grid{display:grid;gap:3px;background:#fff;padding:8px;border-radius:12px;touch-action:none;user-select:none;-webkit-user-select:none}
+  .cell{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-weight:700;color:#1d1d26;
+    font-size:clamp(12px,2.6vw,21px);border-radius:50%;cursor:pointer;transition:background .15s}
+  .cell.sel{background:#cdb9ef}
+  .cell.f0{background:#bfdbfe}.cell.f1{background:#ddd0f3}.cell.f2{background:#fbcfe8}.cell.f3{background:#c7f0dc}.cell.f4{background:#fde7b0}
+  .cell.hint{outline:2px dashed var(--pur);outline-offset:-2px}
+  .side{flex:1 1 320px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .side h2{font-size:.95rem;text-transform:uppercase;letter-spacing:.08em;color:var(--pur);margin:4px 0 10px}
+  .words{list-style:none;margin:0;padding:0}
+  .words li{padding:8px 10px;border-radius:8px;margin-bottom:4px;background:#1e1e28}
+  .words li .w{font-weight:700;letter-spacing:.06em}
+  .words li .def{display:none;color:var(--mut);font-size:.88rem;margin-top:4px;line-height:1.4}
+  .words li.found .w{color:var(--ok);text-decoration:line-through}
+  .words li.found .def{display:block}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  button{font:inherit;font-weight:600;border:0;border-radius:8px;padding:10px 18px;cursor:pointer}
+  .pri{background:var(--pur);color:#fff}.pri:hover{filter:brightness(1.1)}
+  .sec{background:transparent;color:var(--txt);border:1px solid var(--line)}.sec:hover{border-color:var(--pur)}
+  .msg{margin-top:14px;padding:12px 14px;border-radius:8px;background:var(--panel);border-left:3px solid var(--pur);min-height:44px;font-size:.95rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar"></div>
+  <div class="brand">merahki<span>.ai</span></div>
+  <h1>Sopa de letras: migraña en atención primaria</h1>
+  <p class="intro">Encuentre las 10 palabras escondidas. Pueden estar en horizontal, vertical o diagonal. Arrastre el dedo o el mouse desde la primera hasta la última letra (o haga clic en la primera y luego en la última). Al encontrar cada palabra verá una breve definición.</p>
+  <div class="layout">
+    <div class="board">
+      <div class="stats"><span>Encontradas: <b id="cnt">0</b> de <b id="tot">0</b></span><span>Tiempo: <b id="time">0:00</b></span></div>
+      <div id="grid"></div>
+      <div class="msg" id="msg">¡Comience cuando quiera!</div>
+      <div class="btns">
+        <button class="pri" id="hint">Pista</button>
+        <button class="sec" id="reveal">Mostrar soluciones</button>
+        <button class="sec" id="new">Nueva partida</button>
+      </div>
+    </div>
+    <div class="side">
+      <h2>Palabras</h2>
+      <ul class="words" id="words"></ul>
+    </div>
+  </div>
+</div>
+<script>
+const N=12;
+const WORDS=[
+ ["AURA","Síntomas neurológicos transitorios, generalmente visuales, que pueden preceder a la cefalea."],
+ ["CEFALEA","Dolor de cabeza; en la migraña es recurrente y suele ser moderado a severo."],
+ ["NAUSEA","Síntoma digestivo frecuentemente asociado a la crisis."],
+ ["FOTOFOBIA","Molestia o hipersensibilidad ante la luz durante la crisis."],
+ ["FONOFOBIA","Molestia o hipersensibilidad ante el ruido durante la crisis."],
+ ["TRIPTANES","Agonistas 5-HT1B/1D usados en el tratamiento agudo."],
+ ["PRODROMO","Fase previa al dolor: bostezos, irritabilidad, antojos o rigidez cervical."],
+ ["POSTDROMO","Fase posterior a la crisis, con cansancio y dificultad para concentrarse."],
+ ["TRIGEMINO","Nervio craneal cuyo sistema trigeminovascular participa en la migraña."],
+ ["CGRP","Neuropéptido clave en la fisiopatología y blanco de terapias preventivas."]
+];
+// direcciones: derecha, abajo, diagonal abajo-derecha, diagonal arriba-derecha
+const DIRS=[[0,1],[1,0],[1,1],[-1,1]];
+const FILL="AAAAEEEEIIOOOUURRSSNNLLTTCCDDMMPBGVFHJ";
+function rng(seed){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};}
+function build(seed){
+  const R=rng(seed);
+  for(let tries=0;tries<200;tries++){
+    const g=Array.from({length:N},()=>Array(N).fill("")),pos=[];let ok=true;
+    for(const [w] of [...WORDS].sort((a,b)=>b[0].length-a[0].length)){
+      let placed=false;
+      for(let t=0;t<400&&!placed;t++){
+        const [dr,dc]=DIRS[Math.floor(R()*DIRS.length)],r=Math.floor(R()*N),c=Math.floor(R()*N);
+        const er=r+dr*(w.length-1),ec=c+dc*(w.length-1);
+        if(er<0||er>=N||ec>=N)continue;
+        let fits=true;for(let i=0;i<w.length;i++){const x=g[r+dr*i][c+dc*i];if(x&&x!==w[i]){fits=false;break;}}
+        if(!fits)continue;
+        for(let i=0;i<w.length;i++)g[r+dr*i][c+dc*i]=w[i];
+        pos.push({w,r,c,dr,dc});placed=true;}
+      if(!placed){ok=false;break;}}
+    if(!ok)continue;
+    for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(!g[r][c])g[r][c]=FILL[Math.floor(R()*FILL.length)];
+    return{g,pos};}
+  return null;}
+
+let state,found,start,timer,t0,firstClick,colorIdx;
+const gridEl=document.getElementById("grid"),msg=document.getElementById("msg");
+gridEl.style.gridTemplateColumns=`repeat(${N},1fr)`;
+const cellEl=(r,c)=>gridEl.children[r*N+c];
+function lineCells(a,b){const dr=Math.sign(b.r-a.r),dc=Math.sign(b.c-a.c),len=Math.max(Math.abs(b.r-a.r),Math.abs(b.c-a.c));
+  if(!(a.r===b.r||a.c===b.c||Math.abs(b.r-a.r)===Math.abs(b.c-a.c)))return null;
+  return Array.from({length:len+1},(_,i)=>({r:a.r+dr*i,c:a.c+dc*i}));}
+function clearSel(){[...gridEl.children].forEach(e=>e.classList.remove("sel"));}
+function showSel(cs){clearSel();if(cs)cs.forEach(p=>cellEl(p.r,p.c).classList.add("sel"));}
+function newGame(seed){
+  state=build(seed);found=new Set();colorIdx=0;firstClick=null;
+  gridEl.innerHTML="";
+  for(let r=0;r<N;r++)for(let c=0;c<N;c++){const d=document.createElement("div");d.className="cell";d.textContent=state.g[r][c];d.dataset.r=r;d.dataset.c=c;gridEl.appendChild(d);}
+  const ul=document.getElementById("words");ul.innerHTML="";
+  WORDS.forEach(([w,def])=>{const li=document.createElement("li");li.id="w-"+w;li.innerHTML=`<div class="w">${w}</div><div class="def">${def}</div>`;ul.appendChild(li);});
+  document.getElementById("tot").textContent=WORDS.length;document.getElementById("cnt").textContent=0;
+  clearInterval(timer);t0=null;document.getElementById("time").textContent="0:00";
+  msg.textContent="¡Comience cuando quiera!";sendH();}
+function tick(){const s=Math.floor((Date.now()-t0)/1000);document.getElementById("time").textContent=Math.floor(s/60)+":"+String(s%60).padStart(2,"0");}
+function mark(p,cls){for(let i=0;i<p.w.length;i++){const e=cellEl(p.r+p.dr*i,p.c+p.dc*i);e.classList.remove("hint");if(!/f\d/.test(e.className))e.classList.add(cls);}}
+function tryWord(cs){
+  if(!cs||cs.length<2)return false;
+  const s=cs.map(p=>state.g[p.r][p.c]).join(""),rev=[...s].reverse().join("");
+  const hit=state.pos.find(p=>!found.has(p.w)&&(p.w===s||p.w===rev)&&
+    ((p.r===cs[0].r&&p.c===cs[0].c)||(p.r===cs.at(-1).r&&p.c===cs.at(-1).c)));
+  if(!hit)return false;
+  found.add(hit.w);mark(hit,"f"+(colorIdx++%5));
+  document.getElementById("w-"+hit.w).classList.add("found");
+  document.getElementById("cnt").textContent=found.size;
+  const def=WORDS.find(x=>x[0]===hit.w)[1];
+  if(found.size===WORDS.length){clearInterval(timer);
+    msg.innerHTML=`<b>¡Felicitaciones!</b> Encontró las ${WORDS.length} palabras en ${document.getElementById("time").textContent}.`;
+    parent.postMessage({type:"merahki-activity",activity:"sopa-de-letras-migrana",score:found.size,max:WORDS.length,percent:100},"*");}
+  else msg.innerHTML=`<b>${hit.w}:</b> ${def}`;
+  sendH();return true;}
+function startTimer(){if(!t0){t0=Date.now();timer=setInterval(tick,1000);}}
+// arrastrar
+let dragging=false,moved=false;
+const cellAt=e=>{const el=document.elementFromPoint(e.clientX,e.clientY);return el&&el.classList.contains("cell")?{r:+el.dataset.r,c:+el.dataset.c}:null;};
+gridEl.addEventListener("pointerdown",e=>{const p=cellAt(e);if(!p)return;startTimer();
+  if(firstClick){const cs=lineCells(firstClick,p);firstClick=null;if(!tryWord(cs))msg.textContent="Esa selección no corresponde a una palabra. Intente de nuevo.";clearSel();return;}
+  dragging=true;moved=false;start=p;showSel([p]);});
+gridEl.addEventListener("pointermove",e=>{if(!dragging)return;const p=cellAt(e);if(!p)return;
+  if(p.r!==start.r||p.c!==start.c)moved=true;const cs=lineCells(start,p);if(cs)showSel(cs);});
+addEventListener("pointerup",e=>{if(!dragging)return;dragging=false;const p=cellAt(e)||start;
+  if(!moved){firstClick=start;showSel([start]);msg.textContent="Ahora haga clic en la última letra de la palabra.";return;}
+  const cs=lineCells(start,p);if(!tryWord(cs))msg.textContent="Esa selección no corresponde a una palabra. Intente de nuevo.";clearSel();});
+document.getElementById("hint").onclick=()=>{const p=state.pos.find(x=>!found.has(x.w));if(!p)return;startTimer();
+  cellEl(p.r,p.c).classList.add("hint");msg.innerHTML=`Pista: la palabra <b>${p.w}</b> empieza en la letra marcada.`;};
+document.getElementById("reveal").onclick=()=>{state.pos.forEach(p=>{if(!found.has(p.w)){mark(p,"f"+(colorIdx++%5));document.getElementById("w-"+p.w).classList.add("found");}});
+  clearInterval(timer);msg.textContent="Estas son todas las soluciones. Puede iniciar una nueva partida cuando quiera.";sendH();};
+document.getElementById("new").onclick=()=>newGame(Math.floor(Math.random()*1e9));
+function sendH(){parent.postMessage({type:"merahki-height",height:document.documentElement.scrollHeight},"*");}
+addEventListener("resize",sendH);
+newGame(20261118);
+</script>
+</body>
+</html>
