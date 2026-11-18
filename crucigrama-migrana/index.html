@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crucigrama · Migraña en atención primaria</title>
+<style>
+  :root{--bg:#0d0d12;--panel:#17171f;--line:#2a2a36;--txt:#f2f2f7;--mut:#a3a3b5;--pur:#8E6CC8;--ok:#3fbf7f;--bad:#e5566b;
+    --grad:linear-gradient(90deg,#3b82f6,#8E6CC8,#ec4899);}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px 18px 32px}
+  .bar{height:4px;background:var(--grad);border-radius:4px;margin-bottom:18px}
+  h1{font-size:1.45rem;margin:0 0 6px}
+  .brand{font-weight:700;color:var(--mut);font-size:.85rem;letter-spacing:.04em;margin-bottom:8px}
+  .brand span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  p.intro{color:var(--mut);margin:0 0 18px;line-height:1.5}
+  .layout{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+  .board{flex:1 1 440px;min-width:0}
+  #grid{display:grid;gap:2px;width:100%;max-width:560px;user-select:none}
+  .cell{position:relative;aspect-ratio:1/1;}
+  .cell.blk{background:transparent}
+  .cell input{width:100%;height:100%;border:1px solid var(--line);background:#fff;color:#111;text-align:center;
+    font-size:clamp(12px,2.6vw,22px);font-weight:700;text-transform:uppercase;padding:0;border-radius:3px;outline:none;caret-color:transparent}
+  .cell .num{position:absolute;top:1px;left:3px;font-size:clamp(7px,1.2vw,10px);color:#555;pointer-events:none;font-weight:600}
+  .cell input.word{background:#e9e1f7}
+  .cell input:focus{background:#cdb9ef;border-color:var(--pur)}
+  .cell input.ok{background:#d4f3e3;color:#11643b}
+  .cell input.bad{background:#fbd5db;color:#9a1830}
+  .cell input.shown{color:var(--pur)}
+  .clues{flex:1 1 320px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;max-height:640px;overflow:auto}
+  .clues h2{font-size:.95rem;text-transform:uppercase;letter-spacing:.08em;color:var(--pur);margin:6px 0 8px}
+  .clues ol{list-style:none;margin:0 0 14px;padding:0}
+  .clues li{padding:7px 9px;border-radius:7px;cursor:pointer;line-height:1.4;font-size:.93rem;color:#d8d8e4}
+  .clues li b{color:var(--txt);margin-right:6px}
+  .clues li:hover{background:#22222d}
+  .clues li.act{background:#2c2440;color:#fff}
+  .clues li.done{color:var(--ok)}
+  .current{margin:14px 0 0;padding:10px 14px;background:var(--panel);border-left:3px solid var(--pur);border-radius:6px;min-height:44px;font-size:.95rem;max-width:560px}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  button{font:inherit;font-weight:600;border:0;border-radius:8px;padding:10px 18px;cursor:pointer}
+  .pri{background:var(--pur);color:#fff}.pri:hover{filter:brightness(1.1)}
+  .sec{background:transparent;color:var(--txt);border:1px solid var(--line)}.sec:hover{border-color:var(--pur)}
+  .result{margin-top:16px;padding:14px 16px;border-radius:10px;background:var(--panel);border:1px solid var(--line);display:none}
+  .result.show{display:block}
+  .meter{height:8px;background:#2a2a36;border-radius:8px;overflow:hidden;margin-top:8px}
+  .meter div{height:100%;background:var(--grad);width:0;transition:width .5s}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar"></div>
+  <div class="brand">merahki<span>.ai</span></div>
+  <h1>Crucigrama: migraña en atención primaria</h1>
+  <p class="intro">Complete el crucigrama con los conceptos clave de la cápsula. Haga clic en una casilla o en una pista para empezar; vuelva a hacer clic en la casilla para cambiar entre horizontal y vertical. No es necesario escribir tildes.</p>
+  <div class="layout">
+    <div class="board">
+      <div id="grid"></div>
+      <div class="current" id="current">Seleccione una casilla para ver su pista.</div>
+      <div class="btns">
+        <button class="pri" id="check">Comprobar</button>
+        <button class="sec" id="reveal">Mostrar solución</button>
+        <button class="sec" id="reset">Reintentar</button>
+      </div>
+      <div class="result" id="result"><div id="resTxt"></div><div class="meter"><div id="resBar"></div></div></div>
+    </div>
+    <div class="clues">
+      <h2>Horizontales</h2><ol id="across"></ol>
+      <h2>Verticales</h2><ol id="down"></ol>
+    </div>
+  </div>
+</div>
+<script>
+const H=13,W=14;
+// d:0 horizontal, d:1 vertical
+const WORDS=[
+ {w:"CGRP",r:0,c:2,d:0,clue:"Neuropéptido clave en la fisiopatología de la migraña y blanco de terapias preventivas (sigla)."},
+ {w:"PULSATIL",r:2,c:6,d:0,clue:"Cualidad típica del dolor migrañoso, que «late» con el pulso."},
+ {w:"TRIPTANES",r:4,c:0,d:0,clue:"Agonistas de receptores 5-HT1B/1D usados en el tratamiento agudo de la crisis."},
+ {w:"UNILATERAL",r:9,c:2,d:0,clue:"Localización característica del dolor: afecta un solo lado de la cabeza."},
+ {w:"PRODROMO",r:12,c:3,d:0,clue:"Fase que aparece horas o días antes del dolor: bostezos, irritabilidad, antojos."},
+ {w:"CRONICA",r:0,c:2,d:1,clue:"Migraña con cefalea 15 o más días al mes durante más de 3 meses."},
+ {w:"NAUSEA",r:0,c:7,d:1,clue:"Síntoma digestivo frecuentemente asociado a la crisis."},
+ {w:"FOTOFOBIA",r:2,c:4,d:1,clue:"Hipersensibilidad o molestia ante la luz durante la crisis."},
+ {w:"TRIGEMINO",r:4,c:0,d:1,clue:"Nervio craneal cuyo sistema trigeminovascular está implicado en la migraña."},
+ {w:"AURA",r:6,c:6,d:1,clue:"Síntomas neurológicos transitorios, generalmente visuales, que pueden preceder a la cefalea."},
+ {w:"DIARIO",r:7,c:10,d:1,clue:"Herramienta en la que el paciente registra sus crisis, desencadenantes y medicación."}
+];
+const sol=Array.from({length:H},()=>Array(W).fill(null));
+WORDS.forEach(o=>{for(let i=0;i<o.w.length;i++){sol[o.r+(o.d?i:0)][o.c+(o.d?0:i)]=o.w[i];}});
+// numeración
+const starts={};let n=0;
+for(let r=0;r<H;r++)for(let c=0;c<W;c++){const s=WORDS.filter(o=>o.r===r&&o.c===c);if(s.length){n++;starts[r+","+c]=n;s.forEach(o=>o.n=n);}}
+const grid=document.getElementById("grid");grid.style.gridTemplateColumns=`repeat(${W},1fr)`;
+const inp={};
+for(let r=0;r<H;r++)for(let c=0;c<W;c++){
+  const d=document.createElement("div");d.className="cell";
+  if(sol[r][c]){const i=document.createElement("input");i.maxLength=1;i.autocomplete="off";i.setAttribute("aria-label",`Fila ${r+1}, columna ${c+1}`);
+    i.dataset.r=r;i.dataset.c=c;inp[r+","+c]=i;d.appendChild(i);
+    if(starts[r+","+c]){const s=document.createElement("span");s.className="num";s.textContent=starts[r+","+c];d.appendChild(s);}}
+  else d.classList.add("blk");
+  grid.appendChild(d);}
+const cellsOf=o=>[...o.w].map((_,i)=>inp[(o.r+(o.d?i:0))+","+(o.c+(o.d?0:i))]);
+const wordsAt=(r,c)=>WORDS.filter(o=>o.d?(o.c===c&&r>=o.r&&r<o.r+o.w.length):(o.r===r&&c>=o.c&&c<o.c+o.w.length));
+let cur=null;
+function clueList(id,d){const ol=document.getElementById(id);WORDS.filter(o=>o.d===d).sort((a,b)=>a.n-b.n).forEach(o=>{
+  const li=document.createElement("li");li.innerHTML=`<b>${o.n}.</b>${o.clue} <span style="color:var(--mut)">(${o.w.length})</span>`;
+  li.onclick=()=>{select(o);const e=cellsOf(o).find(x=>!x.value)||cellsOf(o)[0];e.focus();};o.li=li;ol.appendChild(li);});}
+clueList("across",0);clueList("down",1);
+function select(o){cur=o;Object.values(inp).forEach(i=>i.classList.remove("word"));cellsOf(o).forEach(i=>i.classList.add("word"));
+  WORDS.forEach(x=>x.li.classList.toggle("act",x===o));
+  document.getElementById("current").innerHTML=`<b>${o.n} ${o.d?"vertical":"horizontal"}:</b> ${o.clue}`;}
+const norm=s=>s.normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-ZÑ]/g,"");
+let lastClicked=null;
+Object.values(inp).forEach(i=>{
+  const r=+i.dataset.r,c=+i.dataset.c;
+  i.addEventListener("mousedown",()=>{const ws=wordsAt(r,c);
+    if(lastClicked===i&&ws.length>1){select(ws.find(o=>o!==cur)||ws[0]);}
+    else if(!cur||!ws.includes(cur))select(ws[0]);lastClicked=i;});
+  i.addEventListener("focus",()=>{const ws=wordsAt(r,c);if(!cur||!ws.includes(cur))select(ws[0]);});
+  i.addEventListener("input",()=>{const v=norm(i.value).slice(-1);i.value=v;i.classList.remove("ok","bad","shown");if(v)move(i,1);updDone();});
+  i.addEventListener("keydown",e=>{
+    if(e.key==="Backspace"&&!i.value){e.preventDefault();move(i,-1,true);}
+    else if(e.key.startsWith("Arrow")){e.preventDefault();const [dr,dc]={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[e.key];
+      const t=inp[(r+dr)+","+(c+dc)];if(t){const ws=wordsAt(r+dr,c+dc);const want=ws.find(o=>o.d===(dr?1:0));if(want)select(want);t.focus();}}
+    else if(e.key==="Enter"||e.key==="Tab"){e.preventDefault();const i2=WORDS.indexOf(cur);const nx=WORDS[(i2+(e.shiftKey?-1:1)+WORDS.length)%WORDS.length];select(nx);cellsOf(nx)[0].focus();}
+  });});
+function move(i,step,clear){if(!cur)return;const cs=cellsOf(cur);const k=cs.indexOf(i)+step;if(cs[k]){cs[k].focus();if(clear){cs[k].value="";cs[k].classList.remove("ok","bad","shown");}}}
+function updDone(){WORDS.forEach(o=>o.li.classList.toggle("done",cellsOf(o).every((x,j)=>x.value===o.w[j])));}
+const res=document.getElementById("result");
+function score(){let ok=0,tot=0;for(const k in inp){tot++;const[r,c]=k.split(",");if(inp[k].value===sol[r][c])ok++;}return{ok,tot};}
+document.getElementById("check").onclick=()=>{
+  for(const k in inp){const[r,c]=k.split(",");const i=inp[k];i.classList.remove("ok","bad");if(i.value)i.classList.add(i.value===sol[r][c]?"ok":"bad");}
+  const s=score(),wd=WORDS.filter(o=>cellsOf(o).every((x,j)=>x.value===o.w[j])).length,p=Math.round(100*s.ok/s.tot);
+  document.getElementById("resTxt").innerHTML=p===100?`<b>¡Excelente!</b> Completó correctamente las ${WORDS.length} palabras.`:
+    `<b>${wd} de ${WORDS.length} palabras correctas</b> · ${s.ok} de ${s.tot} letras (${p} %). Las casillas en rojo tienen errores; corríjalas y vuelva a comprobar.`;
+  res.classList.add("show");document.getElementById("resBar").style.width=p+"%";
+  parent.postMessage({type:"merahki-activity",activity:"crucigrama-migrana",score:s.ok,max:s.tot,percent:p},"*");sendH();};
+document.getElementById("reveal").onclick=()=>{for(const k in inp){const[r,c]=k.split(",");const i=inp[k];if(i.value!==sol[r][c]){i.value=sol[r][c];i.classList.remove("ok","bad");i.classList.add("shown");}}updDone();};
+document.getElementById("reset").onclick=()=>{Object.values(inp).forEach(i=>{i.value="";i.className="";});res.classList.remove("show");updDone();select(WORDS[0]);cellsOf(WORDS[0])[0].focus();};
+function sendH(){parent.postMessage({type:"merahki-height",height:document.documentElement.scrollHeight},"*");}
+addEventListener("load",sendH);addEventListener("resize",sendH);
+</script>
+</body>
+</html>
